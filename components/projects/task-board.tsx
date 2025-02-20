@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Loader } from "lucide-react"
+import { Loader } from "@/components/Loader"
 
 interface Task {
   id: string
@@ -83,7 +83,7 @@ export default function TaskBoard({ projectId }: TaskBoardProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-64">
-        <Loader className="w-8 h-8 animate-spin text-blue-500" />
+         <Loader size="md" />
       </div>
     )
   }
