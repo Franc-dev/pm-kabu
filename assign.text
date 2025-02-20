@@ -1,62 +1,123 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client"
 
 import type React from "react"
-import { useState, use } from "react"
+import { useState, use, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { logger } from "@/lib/logger"
 import toast from "react-hot-toast"
-import type { Task } from "@/src/db/schema"
+import type { Task, User, TeamMember } from "@/src/db/schema"
 import { Loader } from "@/components/Loader"
+import { AssignTeamDialog } from "@/components/AssignTeamDialog"
+
+interface TeamMemberData {
+  team_members: TeamMember;
+  users: User;
+}
 
 export default function NewTaskPage(props: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [teamMembers, setTeamMembers] = useState<TeamMemberData[]>([])
+  const [isLoadingMembers, setIsLoadingMembers] = useState(true)
   const params = use(props.params)
   const projectId = params.id
 
-  const [formData, setFormData] = useState<Partial<Task>>({
+  const [formData, setFormData] = useState<{
+    title: string;
+    description: string | null;
+    status: string;
+    priority: string;
+    dueDate: Date | null;
+    assigneeId: string | null;
+  }>({
     title: "",
     description: "",
     status: "planned",
     priority: "medium",
     dueDate: null,
+    assigneeId: null
   })
+ const fetchTeamMembers = async () => {
+      try {
+        const projectResponse = await fetch(`/api/projects/${projectId}`)
+        const projectData = await projectResponse.json()
+        
+        if (!projectResponse.ok) throw new Error("Failed to fetch project")
+        
+        // Check if project has a valid teamId
+        if (!projectData.teamId) {
+          logger.warn("Project has no associated team", { projectId })
+          setTeamMembers([])
+          return
+        }
+        
+        const teamMembersResponse = await fetch(`/api/teams/${projectData.teamId}/members`)
+        const teamMembersData = await teamMembersResponse.json()
+        logger.info("Fetched team members", { teamMembersData })
+        
+        if (!teamMembersResponse.ok) throw new Error("Failed to fetch team members")
+        
+        setTeamMembers(teamMembersData)
+      } catch (error) {
+        logger.error("Error fetching team members", { 
+          error,
+          projectId,
+          context: "NewTaskPage.fetchTeamMembers" 
+        })
+        toast.error("Failed to load team members")
+      } finally {
+        setIsLoadingMembers(false)
+      }
+    }
+  useEffect(() => {
+   
+  
+    fetchTeamMembers()
+  }, [projectId])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     
-    // Special handling for dueDate
     if (name === 'dueDate') {
-      setFormData(prev => ({ ...prev, [name]: value ? new Date(value) : null }));
+      setFormData(prev => ({ ...prev, [name]: value ? new Date(value) : null }))
+    } else if (name === 'assigneeId') {
+      setFormData(prev => ({ ...prev, [name]: value || null }))
     } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
+      setFormData(prev => ({ ...prev, [name]: value }))
     }
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsSubmitting(true)
-
+  
     try {
       const response = await fetch(`/api/projects/${projectId}/tasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          dueDate: formData.dueDate ? new Date(formData.dueDate) : null,
+          dueDate: formData.dueDate ? formData.dueDate.toISOString() : null,
         }),
       })
-
-      if (!response.ok) throw new Error("Failed to create task")
-
-      const task = await response.json()
-      logger.info("Creating task", { task })
+  
+      const data = await response.json()
+  
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create task')
+      }
+  
+      logger.info("Task created successfully", { task: data })
       toast.success("Task created successfully")
       router.push(`/projects/${projectId}`)
-      router.refresh() // Refresh the page to show the new task
+      router.refresh()
     } catch (error) {
-      logger.error("Error creating task", { error })
-      toast.error("Failed to create task")
+      logger.error("Error creating task", { 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
+      toast.error(error instanceof Error ? error.message : 'Failed to create task')
     } finally {
       setIsSubmitting(false)
     }
@@ -138,6 +199,62 @@ export default function NewTaskPage(props: { params: Promise<{ id: string }> }) 
               </div>
             </div>
 
+<div>
+  <label htmlFor="assigneeId" className="block text-sm font-medium text-gray-700 mb-1">
+    Assign To
+  </label>
+  {isLoadingMembers ? (
+    <select
+      disabled
+      className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50"
+    >
+      <option>Loading team members...</option>
+    </select>
+  ) : teamMembers.length > 0 ? (
+    <select
+      id="assigneeId"
+      name="assigneeId"
+      value={formData.assigneeId ?? ''}
+      onChange={handleChange}
+      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+    >
+      <option value="">Select team member</option>
+      {teamMembers.map((member) => (
+        <option 
+          key={member.team_members.userId ?? "default"} 
+          value={member.team_members.userId ?? ""}
+        >
+          {member.users.name}
+        </option>
+      ))}
+    </select>
+  ) : (
+    <div className="space-y-2">
+      <select
+        disabled
+        className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50"
+      >
+        <option>No team members available</option>
+      </select>
+      <p className="text-sm text-gray-500">
+        This project is not associated with any team. 
+        <AssignTeamDialog
+          projectId={projectId}
+          onTeamAssigned={() => {
+            setIsLoadingMembers(true);
+            fetchTeamMembers();
+          }}
+          trigger={
+            <button type="button" className="text-blue-600 hover:text-blue-800 ml-1">
+              Assign a team to this project
+            </button>
+          }
+        />
+      </p>
+    </div>
+  )}
+</div>
+
             <div>
               <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 mb-1">
                 Due Date
@@ -146,7 +263,7 @@ export default function NewTaskPage(props: { params: Promise<{ id: string }> }) 
                 type="date"
                 id="dueDate"
                 name="dueDate"
-                value={formData.dueDate ? new Date(formData.dueDate).toISOString().split('T')[0] : ''}
+                value={formData.dueDate !== null ? formData.dueDate.toISOString().split('T')[0] : ''}
                 onChange={handleChange}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
               />
@@ -181,4 +298,3 @@ export default function NewTaskPage(props: { params: Promise<{ id: string }> }) 
     </div>
   )
 }
-          

@@ -31,8 +31,13 @@ export default function TeamDetailsPage(props: { params: Promise<{ id: string }>
 
     fetchTeam()
   }, [teamId])
-
-  if (isLoading) return <Loader size="lg" />
+  if (isLoading) {
+    return (
+      <div className="flex items-center m-auto justify-center min-h-64">
+         <Loader size="lg" />
+      </div>
+    )
+  }
   if (!team) return <div>Team not found</div>
 
   return (

@@ -1,14 +1,22 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Download, ChevronLeft, ChevronRight } from 'lucide-react';
-import * as pdfjsLib from 'pdfjs-dist';
 import { logger } from '@/lib/logger';
 import toast from 'react-hot-toast';
 
-// Initialize PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// We'll load PDF.js only on the client side
+let pdfjsLib: any = null;
 
-// Define prop types
+// PDF.js loading function
+async function loadPdfJs() {
+  if (typeof window === 'undefined') return null;
+  
+  const pdfjs = await import('pdfjs-dist');
+  pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+  return pdfjs;
+}
+
 interface DocumentPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -22,26 +30,29 @@ export default function DocumentPreviewModal({
   documentUrl, 
   documentTitle 
 }: DocumentPreviewModalProps) {
-  const [numPages, setNumPages] = useState<number | null | undefined>(null);
+  const [numPages, setNumPages] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null | undefined>(null);
+  const [error, setError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
-    if (!isOpen || !documentUrl) return;
+    // Initialize PDF.js when the component mounts
+    loadPdfJs().then(pdfjs => {
+      pdfjsLib = pdfjs;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen || !documentUrl || !pdfjsLib) return;
 
     const loadPDF = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        // Fetch the PDF as an array buffer
-        const response = await fetch(documentUrl);
-        if (!response.ok) throw new Error('Failed to fetch PDF');
-        
-        const arrayBuffer = await response.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const loadingTask = pdfjsLib.getDocument(documentUrl);
+        const pdf = await loadingTask.promise;
         
         setNumPages(pdf.numPages);
         await renderPage(pdf, 1);
@@ -57,29 +68,31 @@ export default function DocumentPreviewModal({
     loadPDF();
   }, [isOpen, documentUrl, currentPage]);
 
-  const renderPage = async (pdf: pdfjsLib.PDFDocumentProxy, pageNumber: number) => {
+  const renderPage = async (pdf: any, pageNumber: number) => {
+    if (!canvasRef.current || !pdfjsLib) return;
+
     try {
       const page = await pdf.getPage(pageNumber);
       const canvas = canvasRef.current;
-      if (canvas) {
-        const context = canvas.getContext('2d');
-        if (context) {
-          const viewport = page.getViewport({ scale: 1.5 });
-          canvas.height = viewport.height;
-          canvas.width = viewport.width;
+      const context = canvas.getContext('2d');
 
-          await page.render({
-            canvasContext: context,
-            viewport: viewport
-          }).promise;
-        } else {
-          console.error('Failed to get 2D context');
-          setError('Failed to render page: context is null');
-        }
-      } else {
-        console.error('Canvas is null');
-        setError('Failed to render page');
+      if (!context) {
+        throw new Error('Failed to get 2D context');
       }
+
+      // Calculate scale to fit the viewport while maintaining aspect ratio
+      const viewport = page.getViewport({ scale: 1.0 });
+      const containerWidth = canvas.parentElement?.clientWidth ?? 800;
+      const scale = containerWidth / viewport.width;
+      const scaledViewport = page.getViewport({ scale });
+
+      canvas.height = scaledViewport.height;
+      canvas.width = scaledViewport.width;
+
+      await page.render({
+        canvasContext: context,
+        viewport: scaledViewport
+      }).promise;
     } catch (err) {
       console.error('Error rendering page:', err);
       setError('Failed to render page');
@@ -87,37 +100,34 @@ export default function DocumentPreviewModal({
   };
 
   const changePage = async (delta: number) => {
-    if (numPages === null || numPages === undefined) return;
+    if (!numPages) return;
+    
     const newPage = currentPage + delta;
     if (newPage > 0 && newPage <= numPages) {
       setCurrentPage(newPage);
     }
   };
-  const handleDownload = async (doc: Document) => {
+
+  const handleDownload = async () => {
     try {
-      // Fetch the file
-      const response = await fetch(documentUrl)
-      const blob = await response.blob()
-  
-      // Create a temporary URL for the blob
-      const url = window.URL.createObjectURL(blob)
-  
-      // Create a temporary link element
-      const link = document.createElement('a')
-      link.href = url
-      link.download = doc.title || 'document.pdf' // Use document title or fallback
-  
-      // Append to body, click, and cleanup
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
-  
+      const response = await fetch(documentUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = documentTitle || 'document.pdf';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
-      logger.error("Error downloading document", { error, documentId: doc.URL })
-      toast.error("Failed to download document")
+      logger.error("Error downloading document", { error, documentUrl });
+      toast.error("Failed to download document");
     }
-  }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -140,14 +150,13 @@ export default function DocumentPreviewModal({
           <div className="border-b p-4 flex justify-between items-center bg-white">
             <h3 className="text-lg font-medium">{documentTitle}</h3>
             <div className="flex items-center space-x-2">
-            <button
-                  onClick={() => handleDownload(document)}
-                  className="p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
-                  title="Download"
-                >
-                  <Download className="h-5 w-5" />
-                </button>
-
+              <button
+                onClick={handleDownload}
+                className="p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                title="Download"
+              >
+                <Download className="h-5 w-5" />
+              </button>
               <button
                 onClick={onClose}
                 className="p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
@@ -179,7 +188,7 @@ export default function DocumentPreviewModal({
           </div>
 
           {/* Footer with pagination */}
-          {numPages !== null && numPages !== undefined && numPages > 1 && (
+          {numPages !== null && numPages > 1 && (
             <div className="border-t p-4 flex justify-center items-center space-x-4 bg-white">
               <button
                 onClick={() => changePage(-1)}

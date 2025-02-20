@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Loader } from "@/components/Loader"
-import { TaskBoard } from "@/components/projects/task-board"
+import  TaskBoard  from "@/components/projects/task-board"
 import { DocumentList } from "@/components/projects/document-list"
 import { logger } from "@/lib/logger"
 import toast from "react-hot-toast"

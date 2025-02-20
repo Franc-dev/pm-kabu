@@ -1,74 +1,65 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { verifyToken } from "@/lib/auth/jwt"
 import { logger } from "@/lib/logger"
 
-// Define the paths that require authentication
-const protectedPaths = ["/autohrs"]
+// Protected routes that require authentication
+const protectedRoutes = [
+  "/dashboard",
+  "/teams",
+  "/projects"
+]
 
-export async function middleware(request: NextRequest) {
+// Define public routes that don't need authentication
+const publicRoutes = [
+  "/auth/login",
+  "/auth/register",
+  "/",
+  "/favicon.ico",
+  "/api",
+  "/images",
+  "/public",
+  "/_next",  // Next.js internal routes
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".ico",
+  ".svg",
+  ".mp4",
+  ".webp",
+  ".pdf",
+  ".css",
+  ".js",
+  ".json"
+]
+
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Check if the current path should be protected
-  const isProtectedPath = protectedPaths.some((path) => pathname.startsWith(path))
-
-  if (!isProtectedPath) {
-    // If it's not a protected path, allow the request to proceed
+  // First check if it's a protected route
+  if (protectedRoutes.some(route => pathname.startsWith(route))) {
+    const token = request.cookies.get("token")
+    logger.debug("Checking authentication", { token, path: pathname })
+    
+    if (!token) {
+      logger.warn("Unauthorized access attempt", { path: pathname })
+      return NextResponse.redirect(new URL("/auth/login", request.url))
+    }
+  }
+  
+  // Then check if it's a public route
+  if (publicRoutes.some(route => 
+    pathname.startsWith(route) || 
+    pathname.endsWith(route)
+  )) {
     return NextResponse.next()
   }
 
-  // Get token from cookie
-  const token = request.cookies.get("token")?.value
-
-  if (!token) {
-    logger.warn("No token found for protected path", { pathname })
-    // Redirect to login if there's no token
-    const encodedPath = encodeURIComponent(pathname)
-    return NextResponse.redirect(new URL(`/auth/login?from=${encodedPath}`, request.url))
-  }
-
-  try {
-    // Verify the token
-    const payload = await verifyToken(token)
-
-    if (!payload) {
-      logger.warn("Token verification returned null payload", { token })
-      throw new Error("Invalid token payload")
-    }
-
-    // Check if the payload has the expected structure
-    if (typeof payload.id !== "number" || typeof payload.email !== "string" || typeof payload.role !== "string") {
-      logger.warn("Token payload has unexpected structure", { payload })
-      throw new Error("Invalid token structure")
-    }
-
-    // Add user info to headers
-    const requestHeaders = new Headers(request.headers)
-    requestHeaders.set("x-user-id", payload.id.toString())
-    requestHeaders.set("x-user-email", payload.email)
-    requestHeaders.set("x-user-role", payload.role)
-
-    // Continue with the request
-    logger.info("User authenticated for protected path", { pathname, userId: payload.id, role: payload.role })
-    return NextResponse.next({
-      request: {
-        headers: requestHeaders,
-      },
-    })
-  } catch (error) {
-    logger.error("Token verification failed", { error: error, pathname, token })
-    // Token is invalid - redirect to login
-    const response = NextResponse.redirect(new URL("/auth/login", request.url))
-
-    // Clear the invalid token
-    response.cookies.delete("token")
-
-    return response
-  }
+  return NextResponse.next()
 }
 
-// Update the matcher to include all routes
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    '/(.*)'  // Match all routes and let middleware function handle routing
+  ]
 }
-

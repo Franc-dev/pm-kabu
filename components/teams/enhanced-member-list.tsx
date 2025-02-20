@@ -2,68 +2,83 @@
 import React, { useState } from 'react';
 import { User, UserCircle, Calendar, Mail, Shield } from 'lucide-react';
 
-interface Member {
-  id: number;
-  avatarUrl?: string;
-  name: string;
+interface TeamMember {
+  id: string;
+  teamId: string;
+  userId: string;
   role: string;
-  email: string;
   joinedAt: string;
+}
+
+interface UserData {
+  id: string;
+  email: string;
+  name: string;
   isVerified: boolean;
+  avatarUrl?: string;
+}
+
+interface MemberResponse {
+  team_members: TeamMember;
+  users: UserData;
 }
 
 interface MemberListProps {
   teamId: string;
 }
 
-const MemberCard: React.FC<{ member: Member }> = ({ member }) => (
-  <div className="bg-white rounded-lg shadow-md p-6 mb-4 hover:shadow-lg transition-shadow">
-    <div className="flex items-start space-x-4">
-      <div className="bg-blue-100 rounded-full p-3">
-        {member.avatarUrl ? (
-          <img 
-            src={member.avatarUrl} 
-            alt={member.name} 
-            className="w-12 h-12 rounded-full"
-          />
-        ) : (
-          <UserCircle className="w-12 h-12 text-blue-500" />
-        )}
-      </div>
-      
-      <div className="flex-1">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">{member.name}</h3>
-          <span className={`px-3 py-1 rounded-full text-sm ${
-            member.role === 'member' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
-          }`}>
-            {member.role}
-          </span>
+const MemberCard: React.FC<{ data: MemberResponse }> = ({ data }) => {
+  const { team_members, users } = data;
+  
+  return (
+    <div className="bg-white rounded-lg shadow-md p-6 mb-4 hover:shadow-lg transition-shadow">
+      <div className="flex items-start space-x-4">
+        <div className="bg-blue-100 rounded-full p-3">
+          {users.avatarUrl ? (
+            <img 
+              src={users.avatarUrl} 
+              alt={users.name} 
+              className="w-12 h-12 rounded-full"
+            />
+          ) : (
+            <UserCircle className="w-12 h-12 text-blue-500" />
+          )}
         </div>
         
-        <div className="mt-2 space-y-2">
-          <div className="flex items-center text-gray-600">
-            <Mail className="w-4 h-4 mr-2" />
-            <span>{member.email}</span>
+        <div className="flex-1">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">{users.name}</h3>
+            <span className={`px-3 py-1 rounded-full text-sm ${
+              team_members.role === 'member' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+            }`}>
+              {team_members.role}
+            </span>
           </div>
           
-          <div className="flex items-center text-gray-600">
-            <Calendar className="w-4 h-4 mr-2" />
-            <span>Joined {new Date(member.joinedAt).toLocaleDateString()}</span>
-          </div>
-          
-          <div className="flex items-center text-gray-600">
-            <Shield className="w-4 h-4 mr-2" />
-            <span>{member.isVerified ? 'Verified' : 'Unverified'}</span>
+          <div className="mt-2 space-y-2">
+            <div className="flex items-center text-gray-600">
+              <Mail className="w-4 h-4 mr-2" />
+              <span>{users.email}</span>
+            </div>
+            
+            <div className="flex items-center text-gray-600">
+              <Calendar className="w-4 h-4 mr-2" />
+              <span>Joined {new Date(team_members.joinedAt).toLocaleDateString()}</span>
+            </div>
+            
+            <div className="flex items-center text-gray-600">
+              <Shield className="w-4 h-4 mr-2" />
+              <span>{users.isVerified ? 'Verified' : 'Unverified'}</span>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const MemberList = ({ teamId }: MemberListProps) => {
-  const [members, setMembers] = useState<Member[]>([]);
+  const [members, setMembers] = useState<MemberResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -71,22 +86,22 @@ const MemberList = ({ teamId }: MemberListProps) => {
     const fetchMembers = async () => {
       try {
         const response = await fetch(`/api/teams/${teamId}/members`);
-        if (!response.ok) throw new Error('Failed to fetch members')
-        const data = await response.json()
-        setMembers(data.team_members || [])
+        if (!response.ok) throw new Error('Failed to fetch members');
+        const data = await response.json();
+        setMembers(data);
       } catch (err) {
         if (err instanceof Error) {
-          setError(err)
+          setError(err);
         } else {
-          setError(new Error('An unknown error occurred'))
+          setError(new Error('An unknown error occurred'));
         }
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchMembers()
-  }, [teamId])
+    fetchMembers();
+  }, [teamId]);
 
   if (loading) {
     return (
@@ -117,7 +132,7 @@ const MemberList = ({ teamId }: MemberListProps) => {
   return (
     <div className="space-y-4">
       {members.map((member) => (
-        <MemberCard key={member.id} member={member} />
+        <MemberCard key={member.team_members.id} data={member} />
       ))}
     </div>
   );
