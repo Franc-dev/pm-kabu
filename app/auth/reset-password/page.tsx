@@ -1,23 +1,61 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { Suspense } from "react"
 import { motion } from "framer-motion"
-import { Loader, useLoading } from "@/components/Loader"
-import { logger } from "@/lib/logger"
 
-export default function ResetPassword() {
+// Loading fallback component
+function ResetPasswordSkeleton() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8"
+    >
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <div className="h-8 bg-gray-200 rounded w-3/4 mx-auto mb-4 animate-pulse" />
+          <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto animate-pulse" />
+        </div>
+        <div className="mt-8 space-y-6">
+          <div className="rounded-md shadow-sm -space-y-px">
+            <div className="h-10 bg-gray-200 rounded-t-md animate-pulse" />
+            <div className="h-10 bg-gray-200 rounded-b-md animate-pulse" />
+          </div>
+          <div className="h-10 bg-gray-200 rounded-md animate-pulse" />
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+// Main form component
+function ResetPasswordForm() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { isLoading, startLoading, setLoadingError } = useLoading()
+
+  // Get token from URL parameters
+  const token = searchParams.get("token")
+
+  // Redirect if no token is present
+  useEffect(() => {
+    if (!token) {
+      logger.warn("No reset token provided")
+      router.push("/auth/login")
+    }
+  }, [token, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (password !== confirmPassword) {
       setLoadingError(new Error("Passwords do not match"))
+      return
+    }
+
+    if (!token) {
+      setLoadingError(new Error("No reset token provided"))
       return
     }
 
@@ -27,7 +65,7 @@ export default function ResetPassword() {
       const response = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password, token }),
       })
 
       if (response.ok) {
@@ -42,6 +80,11 @@ export default function ResetPassword() {
       setLoadingError(error as Error)
       logger.error("Password reset request failed", { error })
     }
+  }
+
+  // Don't render the form if there's no token
+  if (!token) {
+    return null
   }
 
   return (
@@ -107,3 +150,17 @@ export default function ResetPassword() {
   )
 }
 
+// Imported at the top with other imports
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Loader, useLoading } from "@/components/Loader"
+import { logger } from "@/lib/logger"
+
+// Default export wrapped in Suspense
+export default function ResetPassword() {
+  return (
+    <Suspense fallback={<ResetPasswordSkeleton />}>
+      <ResetPasswordForm />
+    </Suspense>
+  )
+}

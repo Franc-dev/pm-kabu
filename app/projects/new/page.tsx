@@ -1,17 +1,18 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { logger } from "@/lib/logger"
 import toast from "react-hot-toast"
-import type { ProjectStatus } from "@/src/db/schema"
+import type { ProjectStatus, Team } from "@/src/db/schema"
 import { Loader } from "@/components/Loader"
 
 export default function NewProjectPage() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [teams, setTeams] = useState<Team[]>([])
+  const [isLoadingTeams, setIsLoadingTeams] = useState(true)
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -20,8 +21,28 @@ export default function NewProjectPage() {
     endDate: "",
     startTime: "",
     endTime: "",
-    teamId: "", // Add this field
+    teamId: "",
   })
+
+  useEffect(() => {
+    const fetchTeams = async () => {
+      try {
+        const response = await fetch("/api/teams")
+        if (!response.ok) {
+          throw new Error("Failed to fetch teams")
+        }
+        const data = await response.json()
+        setTeams(data)
+      } catch (error) {
+        logger.error("Error fetching teams", { error })
+        toast.error("Failed to load teams")
+      } finally {
+        setIsLoadingTeams(false)
+      }
+    }
+
+    fetchTeams()
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -33,7 +54,7 @@ export default function NewProjectPage() {
     setIsSubmitting(true)
   
     try {
-        logger.info("Creating project", { formData })
+      logger.info("Creating project", { formData })
       const response = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -79,6 +100,33 @@ export default function NewProjectPage() {
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
                 placeholder="Enter project name"
               />
+            </div>
+
+            <div>
+              <label htmlFor="teamId" className="block text-sm font-medium text-gray-700 mb-1">
+                Team
+              </label>
+              <select
+                id="teamId"
+                name="teamId"
+                value={formData.teamId}
+                onChange={handleChange}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                disabled={isLoadingTeams}
+              >
+                <option value="">Select a team</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+              {isLoadingTeams && (
+                <div className="mt-2 text-sm text-gray-500 flex items-center">
+                  <Loader size="sm" className="mr-2" />
+                  Loading teams...
+                </div>
+              )}
             </div>
 
             <div>
@@ -203,4 +251,3 @@ export default function NewProjectPage() {
     </div>
   )
 }
-

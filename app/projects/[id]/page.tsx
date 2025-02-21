@@ -112,7 +112,7 @@ export default function ProjectDetailsPage(props: { params: Promise<{ id: string
                 addLink={`/projects/${project.id}/tasks/new`}
                 addText="Add Task"
               >
-                <TaskBoard projectId={project.id} />
+                <TaskBoard id={project.id} />
               </ProjectSection>
 
               <ProjectSection

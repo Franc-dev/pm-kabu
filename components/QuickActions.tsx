@@ -6,18 +6,34 @@ import { Users, FolderKanban, Plus, Calendar, Settings, Bell, FileText, Home } f
 const QuickActions = () => {
   const actions = [
     {
-      title: 'Teams',
-      description: 'Manage your teams',
+      title: 'Create Teams',
+      description: 'create your team',
       icon: <Users className="h-6 w-6" />,
       href: '/teams/new',
       color: 'bg-blue-500',
       hoverColor: 'hover:bg-blue-600'
     },
     {
-      title: 'Projects',
+      title: 'Create Projects',
       description: 'Create new projects',
       icon: <FolderKanban className="h-6 w-6" />,
       href: '/projects/new',
+      color: 'bg-purple-500',
+      hoverColor: 'hover:bg-purple-600'
+    },
+    {
+      title: 'Teams',
+      description: 'Manage your teams',
+      icon: <Users className="h-6 w-6" />,
+      href: '/teams',
+      color: 'bg-blue-500',
+      hoverColor: 'hover:bg-blue-600'
+    },
+    {
+      title: 'Projects',
+      description: 'Manage projects',
+      icon: <FolderKanban className="h-6 w-6" />,
+      href: '/projects',
       color: 'bg-purple-500',
       hoverColor: 'hover:bg-purple-600'
     },

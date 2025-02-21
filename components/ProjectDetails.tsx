@@ -54,7 +54,7 @@ export function ProjectDetails({ id }: ProjectDetailsProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <h2 className="text-2xl font-semibold mb-4">Tasks</h2>
-          <TaskBoard projectId={project.id} />
+          <TaskBoard id={project.id} />
         </div>
         <div>
           <h2 className="text-2xl font-semibold mb-4">Documents</h2>

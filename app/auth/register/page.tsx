@@ -8,6 +8,7 @@ import Link from "next/link"
 import { motion } from "framer-motion"
 import { Loader, useLoading } from "@/components/Loader"
 import { logger } from "@/lib/logger"
+import toast from "react-hot-toast"
 
 export default function Register() {
   const [name, setName] = useState("")
@@ -29,15 +30,18 @@ export default function Register() {
 
       if (response.ok) {
         logger.success("User registered successfully", { email })
+        toast.success("User registered successfully")
         router.push("/auth/verify")
       } else {
         const error = await response.json()
         setLoadingError(new Error(error.message))
         logger.error("Registration failed", { email, error: error.message })
+        toast.error(error.message)
       }
     } catch (error) {
       setLoadingError(error as Error)
       logger.error("Registration request failed", { email, error })
+      toast.error("Registration request failed")
     }
   }
 

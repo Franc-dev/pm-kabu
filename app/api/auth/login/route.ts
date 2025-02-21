@@ -5,7 +5,7 @@ import { users } from "@/src/db/schema"
 import { eq } from "drizzle-orm"
 import { db } from "@/src/db/drizzle"
 import bcrypt from "bcryptjs"
-import { cookies } from "next/headers" // Add this import
+import { cookies } from "next/headers"
 
 export async function POST(req: Request) {
   try {

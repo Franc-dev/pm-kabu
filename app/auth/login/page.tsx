@@ -8,7 +8,7 @@ import Link from "next/link"
 import { motion } from "framer-motion"
 import { Loader, useLoading } from "@/components/Loader"
 import { logger } from "@/lib/logger"
-
+import toast from "react-hot-toast"
 export default function Login() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -28,16 +28,18 @@ export default function Login() {
 
       if (response.ok) {
         logger.success("User logged in successfully", { email })
-        // Use replace instead of push to avoid issues with the back button
+        toast.success("User logged in successfully")  
         router.replace("/dashboard")
       } else {
         const error = await response.json()
         setLoadingError(new Error(error.message))
         logger.error("Login failed", { email, error: error.message })
+        toast.error(error.message)
       }
     } catch (error) {
       setLoadingError(error as Error)
       logger.error("Login request failed", { email, error })
+      toast.error("Login request failed")
     } finally {
       stopLoading()
     }
