@@ -30,8 +30,10 @@ export default function Register() {
 
       if (response.ok) {
         logger.success("User registered successfully", { email })
-        toast.success("User registered successfully")
-        router.push("/auth/verify")
+        toast.success("Go to your email to verify your account", {
+          duration: 100000 // in milliseconds
+        });
+        router.push("/auth/login")
       } else {
         const error = await response.json()
         setLoadingError(new Error(error.message))
