@@ -26,6 +26,7 @@ export async function POST(req: Request) {
       .values({
         name,
         email,
+        isVerified:true,
         hashedPassword,
         role: "student",
       })
