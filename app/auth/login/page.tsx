@@ -30,6 +30,7 @@ export default function Login() {
         logger.success("User logged in successfully", { email })
         toast.success("User logged in successfully")  
         router.replace("/dashboard")
+        window.location.reload()
       } else {
         const error = await response.json()
         setLoadingError(new Error(error.message))
@@ -42,6 +43,7 @@ export default function Login() {
       toast.error("Login request failed")
     } finally {
       stopLoading()
+     window.location.reload()
     }
   }
 
