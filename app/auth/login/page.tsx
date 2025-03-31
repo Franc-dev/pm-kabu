@@ -29,8 +29,8 @@ export default function Login() {
       if (response.ok) {
         logger.success("User logged in successfully", { email })
         toast.success("User logged in successfully")  
-        router.replace("/dashboard")
         window.location.reload()
+        router.push("/dashboard")
       } else {
         const error = await response.json()
         setLoadingError(new Error(error.message))
